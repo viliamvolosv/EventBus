@@ -92,7 +92,7 @@ public class AsyncExecutor {
     private final Executor threadPool;
     private final Constructor<?> failureEventConstructor;
     private final EventBus eventBus;
-    private Object scope;
+    private final Object scope;
 
     private AsyncExecutor(Executor threadPool, EventBus eventBus, Class<?> failureEventType, Object scope) {
         this.threadPool = threadPool;
@@ -121,8 +121,8 @@ public class AsyncExecutor {
                         Log.e(EventBus.TAG, "Original exception:", e);
                         throw new RuntimeException("Could not create failure event", e1);
                     }
-                    if (e instanceof HasExecutionScope) {
-                        ((HasExecutionScope) e).setExecutionScope(scope);
+                    if (event instanceof HasExecutionScope) {
+                        ((HasExecutionScope) event).setExecutionScope(scope);
                     }
                     eventBus.post(event);
                 }

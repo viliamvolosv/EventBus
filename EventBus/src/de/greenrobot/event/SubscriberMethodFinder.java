@@ -15,8 +15,6 @@
  */
 package de.greenrobot.event;
 
-import android.util.Log;
-
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -26,12 +24,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class SubscriberMethodFinder {
-    private static final int MODIFIERS_IGNORE = Modifier.ABSTRACT | Modifier.STATIC;
-    private static final Map<String, List<SubscriberMethod>> methodCache = new HashMap<String, List<SubscriberMethod>>();
-    private static final Map<Class<?>, Class<?>> skipMethodVerificationForClasses = new ConcurrentHashMap<Class<?>, Class<?>>();
+import android.util.Log;
 
-    public List<SubscriberMethod> findSubscriberMethods(Class<?> subscriberClass, String eventMethodName) {
+public class SubscriberMethodFinder {
+    /*
+     * In newer class files, compilers may add methods. Those are called bridge or synthetic methods.
+     * EventBus must ignore both. There modifiers are not public but defined in the Java class file format:
+     * http://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.6-200-A.1
+     */
+    private static final int BRIDGE = 0x40;
+    private static final int SYNTHETIC = 0x1000;
+
+    private static final int MODIFIERS_IGNORE = Modifier.ABSTRACT | Modifier.STATIC | BRIDGE | SYNTHETIC;
+    private static final Map<String, List<SubscriberMethod>> methodCache = new HashMap<String, List<SubscriberMethod>>();
+
+    private final Map<Class<?>, Class<?>> skipMethodVerificationForClasses;
+
+    public SubscriberMethodFinder(List<Class<?>> skipMethodVerificationForClassesList) {
+        skipMethodVerificationForClasses = new ConcurrentHashMap<Class<?>, Class<?>>();
+        if (skipMethodVerificationForClassesList != null) {
+            for (Class<?> clazz : skipMethodVerificationForClassesList) {
+                skipMethodVerificationForClasses.put(clazz, clazz);
+            }
+        }
+    }
+
+    public  List<SubscriberMethod> findSubscriberMethods(Class<?> subscriberClass, String eventMethodName) {
         String key = subscriberClass.getName() + '.' + eventMethodName;
         List<SubscriberMethod> subscriberMethods;
         synchronized (methodCache) {
@@ -52,7 +70,7 @@ public class SubscriberMethodFinder {
             }
 
             // Starting with EventBus 2.2 we enforced methods to be public (might change with annotations again)
-            Method[] methods = clazz.getMethods();
+            Method[] methods = clazz.getDeclaredMethods();
             for (Method method : methods) {
                 String methodName = method.getName();
                 if (methodName.startsWith(eventMethodName)) {
@@ -112,14 +130,4 @@ public class SubscriberMethodFinder {
         }
     }
 
-    static void skipMethodVerificationFor(Class<?> clazz) {
-        if (!methodCache.isEmpty()) {
-            throw new IllegalStateException("This method must be called before registering anything");
-        }
-        skipMethodVerificationForClasses.put(clazz, clazz);
-    }
-
-    public static void clearSkipMethodVerifications() {
-        skipMethodVerificationForClasses.clear();
-    }
 }
